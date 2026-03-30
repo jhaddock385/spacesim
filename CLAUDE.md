@@ -14,21 +14,31 @@ src/
 ├── init.lua          -- wires modules, registers states, global input
 ├── core/
 │   ├── state.lua     -- state machine (register, set, onEnter/onExit)
-│   └── input.lua     -- centralized input routing by state
-├── ui/
+│   ├── input.lua     -- centralized input routing by state
+│   ├── bus.lua       -- event bus: emit, subscribe, drain with depth limit
+│   ├── store.lua     -- partitioned state store: entity/component/key
+│   └── clock.lua     -- fixed timestep accumulator, freeze/unfreeze
+├── sim/
+│   ├── init.lua      -- simulation coordinator: ticks systems, drains bus
+│   ├── entities.lua  -- entity registry: create/destroy/lookup by string ID
+│   ├── spatial.lua   -- 2D physics: position, velocity, rotation, damping
+│   └── ship/
+│       ├── init.lua      -- ship entity factory: creates ship with subsystems
+│       ├── engineering.lua -- warp core, pip generation, power allocation
+│       └── helm.lua      -- reads thruster power, emits thrust/torque events
+├���─ ui/
 │   └── button.lua    -- clickable button widget
-├── screens/
+├��─ screens/
 │   ├── menu.lua      -- main menu (Start Run, Simulator, Options, Quit)
 │   ├── play.lua      -- game run (placeholder)
-│   ├── simulator.lua -- mechanics testing (placeholder)
+│   ├── simulator.lua -- dev display: spatial map, ship systems, event log
 │   └── options.lua   -- settings (placeholder)
 ├── data/             -- pure data definitions
-├── systems/          -- game logic
 assets/
 ├── images/           -- sprites, textures
 ├── sounds/           -- audio files
 ├── fonts/            -- custom fonts
-lib/                  -- third-party libraries
+lib/                  -- third-party (luasocket, luasec, json)
 ```
 
 ## Tech
@@ -45,7 +55,9 @@ Love2D 11.4, Lua/LuaJIT, VSCode
 - Events and commands reference entities by ID, resolved at apply time
 
 ### Project Structure
-- Data/logic/presentation separation: `src/data/` for pure data, `src/systems/` for logic, `src/ui/` for presentation
+- Three layers: `src/sim/` for deterministic simulation, `src/agents/` (future) for AI crew, `src/screens/` for presentation
+- `src/data/` for pure data definitions, `src/ui/` for reusable widgets
+- All state changes flow through the event bus (`src/core/bus.lua`) and state store (`src/core/store.lua`)
 - Mode orchestrators manage lifecycle; coordinator modules (`init.lua`) wire submodules together
 - One module per concern — don't scatter related logic across the codebase
 
@@ -74,6 +86,9 @@ Maintain an explicit, centralized draw order. Layers (background, game world, pa
 ### State Management
 Use explicit state machines with `onEnter`/`onExit` callbacks and a centralized state module. Game modes and screens are states, not flags.
 
+### Event Bus Architecture
+All simulation state changes flow through the central event bus. Subsystems communicate by emitting and subscribing to events — they never directly mutate each other's state. This applies at every scale: within subsystems (engineering components), between subsystems (tactical -> shields), and between entities (ship-to-ship). The bus drains once per frame with a hard depth limit to prevent infinite cascades.
+
 ### Deferred Mutation
 Prefer queuing changes and processing them at defined points in the frame, rather than mutating game state mid-iteration. This prevents order-dependent bugs and makes the frame lifecycle predictable.
 
@@ -100,6 +115,7 @@ Before creating a new module, system, or pattern, check if an existing one cover
 ## Documentation
 Before starting new work, read the relevant INDEX file(s) to see what documentation exists.
 
+- **Design** — `docs/design/INDEX.md` — game concept, architectural decisions, project structure
 - **Architecture** — `docs/architecture/INDEX.md` — how subsystems work and why
 - **Gotchas** — `docs/gotchas.md` — things that went wrong and why; check when debugging
 
