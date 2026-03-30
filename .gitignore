@@ -1,2 +1,4 @@
 *.love
 .DS_Store
+.env
+secrets.lua

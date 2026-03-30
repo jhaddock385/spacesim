@@ -8,9 +8,11 @@ love .
 
 ## Test
 ```
-love . --test
+love . --test         # unit tests only (no network, no cost)
+love . --test-live    # live tests only (hits Claude API, costs tokens)
+love . --test-all     # everything
 ```
-Runs all tests inside Love2D and exits. Prints results to stdout, saves to `~/Library/Application Support/LOVE/spacesim/test_results.txt`, exits with code 0 (pass) or 1 (failures). Run this after making changes to simulation code.
+Runs tests inside Love2D and exits. Prints results to stdout, saves to `~/Library/Application Support/LOVE/spacesim/test_results.txt`, exits with code 0 (pass) or 1 (failures). Run `--test` after making changes. Only run `--test-live` when specifically testing API connectivity.
 
 ## File Index
 ```
