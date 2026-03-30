@@ -25,7 +25,9 @@ src/
 │   ├── input.lua               -- centralized input routing: per-state + global bindings
 │   ├── bus.lua                 -- event bus: emit, subscribe, drain queue, depth limit, history
 │   ├── store.lua               -- partitioned state store: entity/component/key lookups
-│   └── clock.lua               -- fixed timestep (60Hz), freeze/unfreeze, time scale
+│   ├── clock.lua               -- fixed timestep (60Hz), freeze/unfreeze, time scale
+│   ├── api.lua                 -- Claude API client: sync/async send via curl, tool support
+│   └── log.lua                 -- session logging: writes to Love2D save directory
 ├── sim/
 │   ├── init.lua                -- simulation coordinator: ticks subsystems, drains bus
 │   ├── entities.lua            -- entity registry: create/destroy/lookup by string ID
@@ -34,14 +36,22 @@ src/
 │       ├── init.lua            -- ship factory: creates entity with spatial + engineering
 │       ├── engineering.lua     -- warp core pip generation, pool, thruster allocation
 │       └── helm.lua            -- reads thruster power, emits thrust/torque events
+├── agents/
+│   └── prompt.lua              -- crew prompt builder: system prompt, tools, state snapshot
+├── data/
+│   ├── stations.lua            -- station definitions: actions, queries, visible state per role
+│   └── knowledge/
+│       └── helm.lua            -- helm officer working knowledge (prose for AI)
 ├── ui/
-│   └── button.lua              -- clickable button widget: hover, pressed, onClick
+│   ├── button.lua              -- clickable button widget: hover, pressed, onClick
+│   └── textinput.lua           -- typeable text field: cursor, editing, submit on Enter
 ├── screens/
 │   ├── menu.lua                -- main menu: Start Run, Simulator, Options, Quit buttons
 │   ├── play.lua                -- game run (placeholder, back button)
-│   ├── simulator.lua           -- dev display: spatial map, system panel, event log
+│   ├── simulator.lua           -- dev display + comms mode: spatial map, systems, AI crew
 │   └── options.lua             -- settings (placeholder, back button)
-├── data/                       -- pure data definitions (empty, future use)
+lib/
+├── json.lua                    -- minimal JSON encoder/decoder for API payloads
 tests/
 ├── init.lua                    -- test registry, loads suites, --test CLI handler
 ├── runner.lua                  -- test runner: assertions, suite execution, resetSim()
@@ -52,7 +62,10 @@ tests/
 │   ├── entities_test.lua       -- entity registry: create, destroy, auto-ID, events
 │   ├── spatial_test.lua        -- 2D physics: thrust, torque, damping, integration
 │   ├── engineering_test.lua    -- pip allocation, generation, pool limits, events
-│   └── helm_test.lua           -- thruster power to force/torque translation
+│   ├── helm_test.lua           -- thruster power to force/torque translation
+│   └── api_test.lua            -- JSON encoding/decoding, API init (no network)
+├── live/
+│   └── api_live_test.lua       -- live Claude API call (costs tokens, use --test-live)
 docs/
 ├── architecture/INDEX.md       -- index of architecture docs
 ├── design/INDEX.md             -- index of design docs

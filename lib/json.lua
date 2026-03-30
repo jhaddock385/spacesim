@@ -5,6 +5,17 @@
 
 local M = {}
 
+-- Sentinel value: assign to a table to force it to encode as a JSON array
+-- Usage: local t = {}; t[json.ARRAY_MARKER] = true
+-- Or use json.emptyArray() for convenience
+M.ARRAY_MARKER = newproxy()  -- unique lightuserdata
+
+function M.emptyArray()
+    local t = {}
+    t[M.ARRAY_MARKER] = true
+    return t
+end
+
 -- Encode a Lua value to a JSON string
 function M.encode(value)
     local t = type(value)
@@ -38,7 +49,13 @@ function M.encode(value)
                 break
             end
         end
-        if maxIdx == 0 then isArray = false end
+        if maxIdx == 0 then
+            -- Check for explicit array marker
+            if rawget(value, M.ARRAY_MARKER) then
+                return "[]"
+            end
+            isArray = false
+        end
         -- Check for gaps
         if isArray then
             for i = 1, maxIdx do
@@ -61,6 +78,7 @@ function M.encode(value)
                 if type(k) == "string" then
                     table.insert(parts, M.encode(k) .. ":" .. M.encode(v))
                 end
+                -- Skip ARRAY_MARKER and non-string keys
             end
             return "{" .. table.concat(parts, ",") .. "}"
         end

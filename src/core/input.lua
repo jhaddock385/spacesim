@@ -36,7 +36,8 @@ function M.bindMouseRelease(stateName, btn, handler)
 end
 
 function M.keypressed(key)
-    local s = getState().get()
+    local st = getState()
+    local s = st.get()
     -- State-specific binding first
     if keyBindings[s] and keyBindings[s][key] then
         keyBindings[s][key](key)
@@ -45,6 +46,12 @@ function M.keypressed(key)
     -- Global fallback
     if keyBindings["*"] and keyBindings["*"][key] then
         keyBindings["*"][key](key)
+        return
+    end
+    -- Delegate to current screen
+    local screen = st.getScreen()
+    if screen and screen.keypressed then
+        screen.keypressed(key)
     end
 end
 

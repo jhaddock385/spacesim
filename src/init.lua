@@ -48,10 +48,16 @@ function M.mousereleased(x, y, button)
 end
 
 function M.wheelmoved(x, y)
-    -- Delegate to current screen if it handles it
     local screen = state.getScreen()
     if screen and screen.wheelmoved then
         screen.wheelmoved(x, y)
+    end
+end
+
+function M.textinput(t)
+    local screen = state.getScreen()
+    if screen and screen.textinput then
+        screen.textinput(t)
     end
 end
 

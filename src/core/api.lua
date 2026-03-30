@@ -93,11 +93,10 @@ local function sendLuasocket(requestBody)
     return response, nil
 end
 
--- Send a message to Claude API via curl
+-- Send a message to Claude API via curl (blocking)
 local function sendCurl(requestBody)
     local requestJson = json.encode(requestBody)
 
-    -- Write request to temp file to avoid shell escaping issues
     local tmpPath = os.tmpname()
     local tmpFile = io.open(tmpPath, "w")
     if not tmpFile then
@@ -136,9 +135,52 @@ local function sendCurl(requestBody)
     return response, nil
 end
 
+-- Send a message to Claude API via curl (non-blocking / async)
+-- Launches curl in the background, returns immediately.
+-- Call pollAsync() each frame to check for completion.
+local asyncState = nil  -- {requestPath, responsePath, startTime}
+
+local function sendCurlAsync(requestBody)
+    if asyncState then
+        return false, "async request already in progress"
+    end
+
+    local requestJson = json.encode(requestBody)
+
+    local requestPath = os.tmpname()
+    local responsePath = os.tmpname()
+    os.remove(responsePath)  -- remove so we can detect when curl creates it
+
+    local tmpFile = io.open(requestPath, "w")
+    if not tmpFile then
+        return false, "could not create temp file"
+    end
+    tmpFile:write(requestJson)
+    tmpFile:close()
+
+    local cmd = string.format(
+        'curl -s https://api.anthropic.com/v1/messages '
+        .. '-H "content-type: application/json" '
+        .. '-H "x-api-key: %s" '
+        .. '-H "anthropic-version: 2023-06-01" '
+        .. '-d @%s '
+        .. '-o %s 2>/dev/null &',
+        apiKey, requestPath, responsePath)
+
+    os.execute(cmd)
+
+    asyncState = {
+        requestPath = requestPath,
+        responsePath = responsePath,
+        startTime = love.timer.getTime(),
+    }
+
+    return true, nil
+end
+
 -- Send a message to the Claude API
 -- messages: {{role="user", content="..."}, ...}
--- options: {model=string, max_tokens=number, system=string}
+-- options: {model=string, max_tokens=number, system=string, tools=table}
 -- Returns: response table or nil, error string
 function M.send(messages, options)
     options = options or {}
@@ -151,6 +193,9 @@ function M.send(messages, options)
     if options.system then
         requestBody.system = options.system
     end
+    if options.tools and #options.tools > 0 then
+        requestBody.tools = options.tools
+    end
 
     if backend == "luasocket" then
         return sendLuasocket(requestBody)
@@ -159,6 +204,97 @@ function M.send(messages, options)
     else
         return nil, "no backend initialized (call api.init() first)"
     end
+end
+
+-- Send a message asynchronously (non-blocking)
+-- Returns true if launched, false + error if not
+function M.sendAsync(messages, options)
+    options = options or {}
+
+    local requestBody = {
+        model = options.model or "claude-sonnet-4-20250514",
+        max_tokens = options.max_tokens or 256,
+        messages = messages,
+    }
+    if options.system then
+        requestBody.system = options.system
+    end
+    if options.tools and #options.tools > 0 then
+        requestBody.tools = options.tools
+    end
+
+    if backend == "curl" then
+        return sendCurlAsync(requestBody)
+    else
+        -- Fallback: do blocking send and store result
+        local response, err = M.send(messages, options)
+        if response then
+            asyncState = { done = true, response = response }
+            return true, nil
+        end
+        return false, err
+    end
+end
+
+-- Poll for async response completion
+-- Returns: "pending", nil  (still waiting)
+--          "done", response  (completed)
+--          "error", message  (failed)
+function M.pollAsync()
+    if not asyncState then
+        return "error", "no async request in progress"
+    end
+
+    -- Already resolved (non-curl fallback)
+    if asyncState.done then
+        local response = asyncState.response
+        asyncState = nil
+        return "done", response
+    end
+
+    -- Check if response file exists and has content
+    local f = io.open(asyncState.responsePath, "r")
+    if not f then
+        -- Check timeout (30 seconds)
+        if love.timer.getTime() - asyncState.startTime > 30 then
+            os.remove(asyncState.requestPath)
+            asyncState = nil
+            return "error", "API request timed out"
+        end
+        return "pending", nil
+    end
+
+    local responseJson = f:read("*a")
+    f:close()
+
+    -- File might exist but be empty (curl still writing)
+    if #responseJson == 0 then
+        return "pending", nil
+    end
+
+    -- Try to parse — if it fails, curl might still be writing
+    local ok, response = pcall(json.decode, responseJson)
+    if not ok then
+        -- Could be partial write, wait a bit more
+        -- But if it's been a while, it's probably a real error
+        if love.timer.getTime() - asyncState.startTime > 2 then
+            -- Try once more next frame
+            return "pending", nil
+        end
+        return "pending", nil
+    end
+
+    -- Success — clean up temp files
+    os.remove(asyncState.requestPath)
+    os.remove(asyncState.responsePath)
+    asyncState = nil
+
+    return "done", response
+end
+
+-- Check if an async request is in progress
+function M.isAsyncPending()
+    return asyncState ~= nil and not asyncState.done
 end
 
 -- Extract the text content from a Claude API response
@@ -175,6 +311,23 @@ function M.getResponseText(response)
         end
     end
     return nil, "no text content in response"
+end
+
+-- Extract tool use calls from a Claude API response
+-- Returns: list of {id, name, input} or empty list
+function M.getToolCalls(response)
+    local calls = {}
+    if not response or not response.content then return calls end
+    for _, block in ipairs(response.content) do
+        if block.type == "tool_use" then
+            table.insert(calls, {
+                id = block.id,
+                name = block.name,
+                input = block.input or {},
+            })
+        end
+    end
+    return calls
 end
 
 -- Get which backend is in use

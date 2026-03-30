@@ -27,3 +27,7 @@ end
 function love.wheelmoved(x, y)
     game.wheelmoved(x, y)
 end
+
+function love.textinput(t)
+    game.textinput(t)
+end
