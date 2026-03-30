@@ -6,39 +6,60 @@ A space simulation game built with Love2D. Early development.
 love .
 ```
 
+## Test
+```
+love . --test
+```
+Runs all tests inside Love2D and exits. Prints results to stdout, saves to `~/Library/Application Support/LOVE/spacesim/test_results.txt`, exits with code 0 (pass) or 1 (failures). Run this after making changes to simulation code.
+
 ## File Index
 ```
-main.lua              -- LOVE callback delegation
-conf.lua              -- window config (1280x720, resizable)
+main.lua                        -- LOVE callback delegation (load, update, draw, input)
+conf.lua                        -- window config (1280x720, resizable, Love2D 11.4)
 src/
-├── init.lua          -- wires modules, registers states, global input
+├── init.lua                    -- wires modules, registers screens, global escape binding
 ├── core/
-│   ├── state.lua     -- state machine (register, set, onEnter/onExit)
-│   ├── input.lua     -- centralized input routing by state
-│   ├── bus.lua       -- event bus: emit, subscribe, drain with depth limit
-│   ├── store.lua     -- partitioned state store: entity/component/key
-│   └── clock.lua     -- fixed timestep accumulator, freeze/unfreeze
+│   ├── state.lua               -- screen state machine: register, set, onEnter/onExit
+│   ├── input.lua               -- centralized input routing: per-state + global bindings
+│   ├── bus.lua                 -- event bus: emit, subscribe, drain queue, depth limit, history
+│   ├── store.lua               -- partitioned state store: entity/component/key lookups
+│   └── clock.lua               -- fixed timestep (60Hz), freeze/unfreeze, time scale
 ├── sim/
-│   ├── init.lua      -- simulation coordinator: ticks systems, drains bus
-│   ├── entities.lua  -- entity registry: create/destroy/lookup by string ID
-│   ├── spatial.lua   -- 2D physics: position, velocity, rotation, damping
+│   ├── init.lua                -- simulation coordinator: ticks subsystems, drains bus
+│   ├── entities.lua            -- entity registry: create/destroy/lookup by string ID
+│   ├── spatial.lua             -- 2D physics: position, velocity, rotation, damping, forces
 │   └── ship/
-│       ├── init.lua      -- ship entity factory: creates ship with subsystems
-│       ├── engineering.lua -- warp core, pip generation, power allocation
-│       └── helm.lua      -- reads thruster power, emits thrust/torque events
-├���─ ui/
-│   └── button.lua    -- clickable button widget
-├��─ screens/
-│   ├── menu.lua      -- main menu (Start Run, Simulator, Options, Quit)
-│   ├── play.lua      -- game run (placeholder)
-│   ├── simulator.lua -- dev display: spatial map, ship systems, event log
-│   └── options.lua   -- settings (placeholder)
-├── data/             -- pure data definitions
+│       ├── init.lua            -- ship factory: creates entity with spatial + engineering
+│       ├── engineering.lua     -- warp core pip generation, pool, thruster allocation
+│       └── helm.lua            -- reads thruster power, emits thrust/torque events
+├── ui/
+│   └── button.lua              -- clickable button widget: hover, pressed, onClick
+├── screens/
+│   ├── menu.lua                -- main menu: Start Run, Simulator, Options, Quit buttons
+│   ├── play.lua                -- game run (placeholder, back button)
+│   ├── simulator.lua           -- dev display: spatial map, system panel, event log
+│   └── options.lua             -- settings (placeholder, back button)
+├── data/                       -- pure data definitions (empty, future use)
+tests/
+├── init.lua                    -- test registry, loads suites, --test CLI handler
+├── runner.lua                  -- test runner: assertions, suite execution, resetSim()
+├── unit/
+│   ├── bus_test.lua            -- event bus: emit, subscribe, drain, filtering, cascading
+│   ├── store_test.lua          -- state store: set/get, components, entities, removal
+│   ├── clock_test.lua          -- fixed timestep, freeze/unfreeze, time scale
+│   ├── entities_test.lua       -- entity registry: create, destroy, auto-ID, events
+│   ├── spatial_test.lua        -- 2D physics: thrust, torque, damping, integration
+│   ├── engineering_test.lua    -- pip allocation, generation, pool limits, events
+│   └── helm_test.lua           -- thruster power to force/torque translation
+docs/
+├── architecture/INDEX.md       -- index of architecture docs
+├── design/INDEX.md             -- index of design docs
+├── gotchas.md                  -- non-obvious problems and solutions
 assets/
-├── images/           -- sprites, textures
-├── sounds/           -- audio files
-├── fonts/            -- custom fonts
-lib/                  -- third-party (luasocket, luasec, json)
+├── images/                     -- sprites, textures
+├── sounds/                     -- audio files
+├── fonts/                      -- custom fonts
+lib/                            -- third-party (luasocket, luasec, json — future)
 ```
 
 ## Tech
@@ -113,10 +134,13 @@ Before creating a new module, system, or pattern, check if an existing one cover
 - Keep commit messages concise and focused on the "why"
 
 ## Documentation
-Before starting new work, read the relevant INDEX file(s) to see what documentation exists.
 
+**Before modifying any existing system, check `docs/architecture/INDEX.md` for a relevant architecture doc and read it first.** These docs explain how subsystems work, why they're structured that way, and what patterns to follow. Skipping this step risks breaking conventions or duplicating existing patterns.
+
+Before starting new work in a new area, also check the design docs for context on decisions already made.
+
+- **Architecture** — `docs/architecture/INDEX.md` — how subsystems work and why. **Read before touching existing code.**
 - **Design** — `docs/design/INDEX.md` — game concept, architectural decisions, project structure
-- **Architecture** — `docs/architecture/INDEX.md` — how subsystems work and why
 - **Gotchas** — `docs/gotchas.md` — things that went wrong and why; check when debugging
 
 ### When to Write Docs

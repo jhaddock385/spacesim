@@ -19,6 +19,11 @@ input.bindKey("*", "escape", function()
 end)
 
 function M.load()
+    -- Load and run tests if --test flag is present
+    local tests = require("tests")
+    tests.load()
+    tests.handleCLI()  -- exits if --test flag found
+
     state.set("menu")
 end
 
